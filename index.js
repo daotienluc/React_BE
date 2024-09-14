@@ -1,34 +1,55 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
-const connectDB = require("./config/db");
-const authRoutes = require("./routes/authRoutes");
-const products = require("./routes/products");
-const authMiddleware = require("./middleware/auth");
-const path = require("path");
+// Import routes
+import authRoutes from "./routes/authRoutes.js";
+import adminRouter from "./routes/adminRouter.js";
+import productRouter from "./routes/productRouter.js";
+import provinceRouter from "./routes/provinceRouter.js";
 
 const app = express();
 
-connectDB();
+// Cấu hình dotenv
+import "dotenv/config";
+
+// Cấu hình express
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(cors());
+
+// Kết nối với MongoDB
+mongoose.set("strictQuery", false);
+mongoose
+  .connect(process.env.DATABASE_URL, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("mongoDB is connected"))
+  .catch((err) => console.log(err));
+
+// Định nghĩa đường dẫn và các middleware
+app.get("/", (req, res) => {
+  res.send("Welcome");
+});
 
 // Cấu hình để phục vụ tệp tĩnh từ thư mục uploads
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.use(cors());
-app.use(bodyParser.json());
+// Định nghĩa các route
+app.use("/api", authRoutes);
 
-app.use("/api/auth", authRoutes);
-app.use("/api/auth", products);
+// ProvinceRouter
+app.use("/api/auth", provinceRouter);
 
-app.get("/admin", authMiddleware, (req, res) => {
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Truy cập bị từ chối" });
-  }
-
-  res.json({ message: "Chào mừng đến với trang quản trị!" });
-});
+// Thuộc admin
+app.use("/api/auth", adminRouter);
+app.use("/api/auth", productRouter);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
